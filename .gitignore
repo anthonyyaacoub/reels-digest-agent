@@ -1,0 +1,23 @@
+# Environment & secrets
+.env
+
+# Data (SQLite DB and downloaded audio files)
+data/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

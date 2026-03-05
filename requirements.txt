@@ -1,0 +1,7 @@
+fastapi>=0.104.0
+uvicorn>=0.24.0
+yt-dlp>=2024.01.01
+openai-whisper>=20231117
+anthropic>=0.40.0
+notion-client>=2.2.0
+python-dotenv>=1.0.0
