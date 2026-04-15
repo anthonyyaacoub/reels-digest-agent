@@ -1,6 +1,9 @@
 # Environment & secrets
 .env
 
+# Claude Code local settings
+.claude/
+
 # Data (SQLite DB and downloaded audio files)
 data/
 
