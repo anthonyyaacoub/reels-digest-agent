@@ -20,6 +20,7 @@ WHISPER_MODEL: str = os.getenv("WHISPER_MODEL", "base")
 PORT: int = int(os.getenv("PORT", "8000"))
 TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_ALLOWED_USER_ID: int = int(os.getenv("TELEGRAM_ALLOWED_USER_ID", "0"))
+MEDIUM_SID: str = os.getenv("MEDIUM_SID", "")
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
