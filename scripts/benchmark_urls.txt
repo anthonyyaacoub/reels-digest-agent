@@ -1,0 +1,22 @@
+# Benchmark suite for /api/article fetchers.
+# Lines starting with # are comments; blank lines ignored.
+# Mix: medium.com proper, medium publications, custom-domain Medium, plain blogs.
+# All URLs are real article shares from past brain/raw/articles or stable public posts.
+
+# Medium proper (member-only / paywall-likely)
+https://medium.com/@Micheal-Lanham/building-agents-in-2026-why-the-harness-matters-more-than-the-model-eb72448fee04
+
+# Medium publication subdomains
+https://medium.com/data-science-collective/claude-code-hooks-explained-the-missing-layer-between-prompts-and-production-d0e3d1509278
+https://medium.com/neuralnotions/andrej-karpathy-stopped-using-ai-to-write-code-hes-using-it-to-build-a-second-brain-instead-cddceadc5df5
+https://medium.com/obsidian-observer/two-claude-x-obsidian-tweaks-that-are-actually-useful-f74ce7652e3f
+https://medium.com/tech-and-ai-guild/how-claude-code-and-obsidian-broke-personal-knowledge-management-d00dc8ae88d3
+
+# Custom-domain Medium publications (cookies need canonical-rewrite trick)
+https://ai.plainenglish.io/build-your-first-claude-code-skill-a-simple-project-memory-system-that-saves-hours-1d13f21aff9e
+https://levelup.gitconnected.com/how-to-structure-claude-folder-for-maximum-efficiency-c26ef3f552ba
+
+# Plain non-Medium blogs (no cookies, no Cloudflare)
+https://www.paulgraham.com/founders.html
+https://overreacted.io/a-complete-guide-to-useeffect/
+https://simonwillison.net/2024/Mar/8/gpt-4o/
