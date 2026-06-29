@@ -96,33 +96,77 @@ def _transcript_blocks(transcript: str) -> list[dict[str, Any]]:
 
 # ── Main publisher ────────────────────────────────────────────────────────────
 
+def _reel_blocks(reel: dict[str, Any]) -> list[dict[str, Any]]:
+    """Render a single reel as a sequence of Notion blocks."""
+    summary: Summary = reel["summary"]
+    url: str = reel["url"]
+    transcript: str = reel.get("transcript", "")
+
+    blocks: list[dict[str, Any]] = [_heading(2, summary["title"])]
+    if summary["takeaways"]:
+        blocks.append(_callout(summary["takeaways"], emoji="💡"))
+    if summary["action_items"]:
+        blocks.append(_callout(summary["action_items"], emoji="✅"))
+    transcript_children = _transcript_blocks(transcript) if transcript else [
+        _paragraph("(No transcript available)")
+    ]
+    blocks.append(_toggle("Full Transcript", transcript_children))
+    blocks.append(_link_paragraph("View original reel →", url))
+    blocks.append(_divider())
+    return blocks
+
+
+_data_source_id: str | None = None
+
+
+def _get_data_source_id() -> str | None:
+    """Resolve and cache the database's primary data source ID (notion-client 3.x)."""
+    global _data_source_id
+    if _data_source_id is not None:
+        return _data_source_id
+    try:
+        db = _notion.databases.retrieve(NOTION_DATABASE_ID)
+        sources = db.get("data_sources") or []
+        if sources:
+            _data_source_id = sources[0]["id"]
+            return _data_source_id
+    except Exception as exc:
+        logger.warning("Could not retrieve data source for database: %s", exc)
+    return None
+
+
+def _find_existing_page(date_str: str) -> tuple[str, str] | None:
+    """Return (page_id, page_url) for an existing digest page on this date, or None."""
+    ds_id = _get_data_source_id()
+    if not ds_id:
+        return None
+    try:
+        result = _notion.data_sources.query(
+            data_source_id=ds_id,
+            filter={"property": "Date", "date": {"equals": date_str}},
+            page_size=1,
+        )
+    except Exception as exc:
+        logger.warning("Notion query for existing page failed: %s — will create new page", exc)
+        return None
+
+    pages = result.get("results", [])
+    if not pages:
+        return None
+    page = pages[0]
+    return page["id"], page.get("url", "")
+
+
 def publish_digest(
     digest_date: date,
     reels: list[dict[str, Any]],
 ) -> str:
     """
-    Create a Notion page for the daily digest.
+    Publish a daily digest to Notion. If a page for ``digest_date`` already
+    exists in the database, append the new reels to it; otherwise create a
+    new page.
 
-    Parameters
-    ----------
-    digest_date:
-        The date this digest covers.
-    reels:
-        List of dicts, each with keys:
-        - ``id`` (str)
-        - ``url`` (str)
-        - ``transcript`` (str)
-        - ``summary`` (:class:`Summary`)
-
-    Returns
-    -------
-    str
-        URL of the newly created Notion page.
-
-    Raises
-    ------
-    RuntimeError
-        If the Notion API call fails.
+    Returns the URL of the (new or existing) page.
     """
     date_str = digest_date.isoformat()
     count = len(reels)
@@ -130,39 +174,26 @@ def publish_digest(
 
     logger.info("Publishing digest '%s' with %d reel(s) to Notion…", title, count)
 
-    # ── Top-level page blocks ─────────────────────────────────────────────────
+    existing = _find_existing_page(date_str)
+
+    if existing:
+        page_id, page_url = existing
+        new_blocks = [block for reel in reels for block in _reel_blocks(reel)]
+        try:
+            _notion.blocks.children.append(block_id=page_id, children=new_blocks)
+        except Exception as exc:
+            raise RuntimeError(f"Failed to append to Notion page {page_id}: {exc}") from exc
+        logger.info("Appended %d reel(s) to existing Notion page: %s", count, page_url)
+        return page_url
+
     blocks: list[dict[str, Any]] = [
         _heading(1, f"Daily Reels Digest — {date_str}"),
         _paragraph(f"{count} reel{'s' if count != 1 else ''} processed"),
         _divider(),
     ]
-
     for reel in reels:
-        summary: Summary = reel["summary"]
-        url: str = reel["url"]
-        transcript: str = reel.get("transcript", "")
+        blocks.extend(_reel_blocks(reel))
 
-        blocks.append(_heading(2, summary["title"]))
-
-        # Key takeaways callout
-        if summary["takeaways"]:
-            blocks.append(_callout(summary["takeaways"], emoji="💡"))
-
-        # Action items callout
-        if summary["action_items"]:
-            blocks.append(_callout(summary["action_items"], emoji="✅"))
-
-        # Full transcript in a toggle
-        transcript_children = _transcript_blocks(transcript) if transcript else [
-            _paragraph("(No transcript available)")
-        ]
-        blocks.append(_toggle("Full Transcript", transcript_children))
-
-        # Link to original reel
-        blocks.append(_link_paragraph("View original reel →", url))
-        blocks.append(_divider())
-
-    # ── Create the Notion page ────────────────────────────────────────────────
     try:
         response = _notion.pages.create(
             parent={"database_id": NOTION_DATABASE_ID},
