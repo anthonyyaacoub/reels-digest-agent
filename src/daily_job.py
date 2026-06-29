@@ -6,10 +6,13 @@ from datetime import date, datetime, timezone
 from typing import Any, Optional
 
 from . import db
-from .downloader import cleanup_audio, download_audio
+from .brain_dropper import drop_reel
+from .downloader import cleanup_audio, download_audio, fetch_caption
 from .notion_publisher import publish_digest
+from .reel_planner import generate_plan
 from .summarizer import summarize
 from .transcriber import transcribe
+from .visual_extractor import cleanup_visuals, extract_visuals
 
 logger = logging.getLogger(__name__)
 
@@ -23,22 +26,41 @@ def _process_reel(reel: Any) -> Optional[dict[str, Any]]:
     """
     reel_id: str = reel["id"]
     url: str = reel["url"]
+    note: Optional[str] = reel["note"] if "note" in reel.keys() else None
     logger.info("Processing reel %s (%s)…", reel_id, url)
 
     audio_path = None
+    visual_paths: list = []
     try:
-        # 1. Download
-        audio_path = download_audio(reel_id, url)
+        # 1. Audio (best-effort — image-only carousels have none)
+        transcript = ""
+        try:
+            audio_path = download_audio(reel_id, url)
+            transcript = transcribe(audio_path)
+        except RuntimeError as exc:
+            logger.info("No audio track for %s (likely image-only post): %s", reel_id, exc)
 
-        # 2. Transcribe
-        transcript = transcribe(audio_path)
+        # 2. Visuals — keyframes for videos, full images for carousels
+        visual_paths = extract_visuals(reel_id, url)
 
-        # 3. Summarize
-        summary = summarize(transcript)
+        # 2b. Caption fallback — yt-dlp can't pull image URLs from many
+        # image-only IG carousels, so when audio + visuals are both empty
+        # we use the post caption as the textual signal for summarization.
+        if not transcript.strip() and not visual_paths:
+            caption = fetch_caption(url)
+            if caption:
+                logger.info("Using caption fallback for %s (%d chars)", reel_id, len(caption))
+                transcript = caption
+
+        # 3. Summarize transcript + images together (+ any note the user attached)
+        summary = summarize(transcript, image_paths=visual_paths, note=note)
 
         # 4. Persist
         db.mark_done(reel_id, transcript, json.dumps(summary))
         logger.info("Reel %s done — title: %s", reel_id, summary["title"])
+
+        # 5. Drop into brain/raw/reels/ for the wiki ingest (best-effort).
+        drop_reel(reel_id, url, transcript, summary)
 
         return {
             "id": reel_id,
@@ -55,6 +77,8 @@ def _process_reel(reel: Any) -> Optional[dict[str, Any]]:
     finally:
         if audio_path is not None:
             cleanup_audio(audio_path)
+        if visual_paths:
+            cleanup_visuals(visual_paths)
 
 
 def run_daily_digest(dry_run: bool = False) -> bool:
@@ -120,11 +144,21 @@ def run_daily_digest(dry_run: bool = False) -> bool:
         notion_url = publish_digest(today, results)
         db.log_digest(today.isoformat(), notion_url, succeeded)
         _print_summary(results, failed, notion_url=notion_url, dry_run=False)
-        return True
     except Exception as exc:
         logger.error("Failed to publish digest to Notion: %s", exc, exc_info=True)
         _print_summary(results, failed, notion_url=None, dry_run=False)
-        return False
+        # Don't return early — still try to generate plans even if Notion failed.
+
+    # Per-reel planning pass — wraps each call so a single failure doesn't
+    # block the rest. Plan files land in <matched-project>/docs/plans/ or
+    # ~/projects/_inbox/, with a pointer appended to data/todos.md.
+    for r in results:
+        try:
+            generate_plan(r)
+        except Exception as exc:
+            logger.warning("Plan generation crashed for %s: %s", r.get("url"), exc)
+
+    return True
 
 
 def _print_summary(

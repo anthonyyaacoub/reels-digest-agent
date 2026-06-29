@@ -76,7 +76,7 @@ async def _handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     url = match.group(0).rstrip("/") + "/"
     db.init_db()
-    reel_id = db.add_reel(url)
+    reel_id, _ = db.add_reel(url)
     logger.info("Telegram: queued reel %s from user %d", reel_id, user_id)
 
     counts = db.get_reel_counts()

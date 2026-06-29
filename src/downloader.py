@@ -7,7 +7,7 @@ from typing import Optional
 
 import yt_dlp
 
-from .config import DOWNLOAD_DIR
+from .config import DOWNLOAD_DIR, INSTAGRAM_COOKIES_FILE
 
 # Resolve ffmpeg: prefer PATH, fall back to the WinGet install location
 def _find_ffmpeg() -> Optional[str]:
@@ -74,6 +74,7 @@ def download_audio(reel_id: str, url: str) -> Path:
         },
         "socket_timeout": 30,
         "retries": 3,
+        **({"cookiefile": str(INSTAGRAM_COOKIES_FILE)} if INSTAGRAM_COOKIES_FILE.exists() else {}),
     }
 
     logger.info("Downloading reel %s from %s", reel_id, url)
@@ -92,6 +93,32 @@ def download_audio(reel_id: str, url: str) -> Path:
 
     logger.info("Audio saved to %s (%.1f KB)", audio_path, audio_path.stat().st_size / 1024)
     return audio_path
+
+
+def fetch_caption(url: str) -> str:
+    """Return the post caption via yt-dlp metadata-only extraction.
+
+    Used as a last-resort signal when audio + visuals both fail (typical for
+    image-only carousels that yt-dlp can't pull image URLs from). Returns ""
+    on any error so callers can fall through quietly.
+    """
+    from .config import INSTAGRAM_COOKIES_FILE
+
+    ydl_opts: dict = {
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+        "ignore_no_formats_error": True,
+        "socket_timeout": 30,
+        **({"cookiefile": str(INSTAGRAM_COOKIES_FILE)} if INSTAGRAM_COOKIES_FILE.exists() else {}),
+    }
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+        return (info.get("description") or "").strip()
+    except Exception as exc:
+        logger.warning("fetch_caption failed for %s: %s", url, exc)
+        return ""
 
 
 def cleanup_audio(audio_path: Path) -> None:

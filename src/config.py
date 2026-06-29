@@ -31,6 +31,15 @@ DOWNLOAD_DIR: Path = Path(
     os.getenv("DOWNLOAD_DIR", str(_BASE_DIR / "data" / "downloads"))
 )
 
+# Netscape-format cookie file passed to yt-dlp for Instagram fetches. Lets
+# yt-dlp ride a logged-in session and reach gated carousel / image-only posts.
+# Export via the Cookie-Editor browser extension on instagram.com → "Netscape
+# HTTP Cookie File" format. If the file is absent, yt-dlp runs cookieless and
+# many carousels will fail with "Requested content is not available".
+INSTAGRAM_COOKIES_FILE: Path = Path(
+    os.getenv("INSTAGRAM_COOKIES_FILE", str(_BASE_DIR / "data" / "instagram_cookies.txt"))
+)
+
 # Ensure directories exist at import time
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
