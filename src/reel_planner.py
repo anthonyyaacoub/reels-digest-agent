@@ -38,6 +38,27 @@ _INBOX = _HOME / "projects" / "_inbox"
 _TODOS_SECTION = "## Plans (from articles + reels)"
 _TODOS_VERIFY_HEADER = "## How to verify a row is wired up"
 
+# Only plan a reel when the user's attached note asks to build/act on it —
+# a saved reel with no note (or a purely descriptive note) is "watch later",
+# not a committed project. Added 2026-07-13 after auto-planning every reel
+# filled todos.md with a graveyard of plans the user never meant to build.
+# ponytail: keyword heuristic, conservative by design (favors false-negatives —
+# a missed plan the user can re-request beats an unwanted todo). Swap for a
+# tiny classifier call only if it misses genuine intent in practice.
+_BUILD_INTENT = (
+    "build", "implement", "plan this", "plan it", "let's do", "lets do",
+    "let's build", "lets build", "we should build", "add to my list",
+    "add to todos", "add this to", "wire this up", "wire it up",
+    "set this up", "turn this into a plan", "make this happen", "action this",
+)
+
+
+def _has_build_intent(note: str | None) -> bool:
+    if not note:
+        return False
+    low = note.lower()
+    return any(phrase in low for phrase in _BUILD_INTENT)
+
 # Stable project map for the classifier. Keep in sync with the matching
 # heuristics documented in ~/.claude/rules/telegram-handlers.md Pattern B.
 _PROJECT_HINTS = {
@@ -224,6 +245,13 @@ def _synthesize(matched: str, url: str, title: str, takeaways: list[str], summar
 def generate_plan(reel_result: dict[str, Any]) -> Path | None:
     """Generate a plan markdown file for one reel result. Returns the plan path on success, None on failure."""
     try:
+        if not _has_build_intent(reel_result.get("note")):
+            logger.info(
+                "Reel %s: no build-intent in note, skipping plan.",
+                reel_result.get("id"),
+            )
+            return None
+
         summary = reel_result.get("summary") or {}
         title = summary.get("title", "Untitled reel")
         takeaways = summary.get("takeaways", [])

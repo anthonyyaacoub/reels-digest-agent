@@ -67,6 +67,7 @@ def _process_reel(reel: Any) -> Optional[dict[str, Any]]:
             "url": url,
             "transcript": transcript,
             "summary": summary,
+            "note": note,
         }
 
     except Exception as exc:
