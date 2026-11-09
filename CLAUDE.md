@@ -46,7 +46,7 @@ Optional:
 
 ## Architecture
 
-**Telegram front door**: The Telegram bot token is consumed by the Claude Code `plugin:telegram:telegram` MCP plugin (not by `src/telegram_bot.py`). When an Instagram reel or Medium article URL arrives, Claude detects it and POSTs to the local FastAPI server. Routing rules live in `~/.claude/rules/telegram-handlers.md`. **`src/telegram_bot.py` is kept for reference but must not be run** — its long-polling grab on the bot token would conflict with the MCP plugin.
+**Telegram front door**: The Telegram bot token is consumed by the Claude Code `plugin:telegram:telegram` MCP plugin (not by `src/telegram_bot.py`). When an Instagram reel or Medium article URL arrives, Claude detects it and POSTs to the local FastAPI server. Routing rules live in `~/.claude/rules-scoped/telegram-handlers.md`. **`src/telegram_bot.py` is kept for reference but must not be run** — its long-polling grab on the bot token would conflict with the MCP plugin.
 
 **FastAPI server** (`run_server.py` → `src/server.py`) — the single backend. Endpoints:
 - `POST /api/reel` (Bearer auth) — queues an Instagram reel/post URL in SQLite. Idempotent: response `{"status": "<action>", "id": "<reel_id>"}` where action is `queued` (new), `requeued` (was in error, reset to pending), `already_pending`, or `already_done`. Re-sharing a previously processed URL is a no-op. Also accepts requests from the iOS Shortcut and the mobile web UI at `/`.
@@ -94,3 +94,9 @@ Structured per-project memory lives in `docs/project_notes/`. Check it before an
 - `issues.md` — work log keyed by ticket / PR. Optional; this project uses `data/todos.md` and `docs/plans/` instead, so `issues.md` is reserved for cross-cutting logs that don't fit either.
 
 User-scope memory at `~/.claude/memory/` covers cross-project identity, patterns, and decisions. Per-project memory here covers anything specific to this codebase. Check both when answering questions about this project; prefer the per-project file when they conflict.
+
+## Scoped rules
+
+FastAPI rules (blocking I/O in async routes, response-model leakage, CORS, dependency-override cleanup) — not loaded globally, pulled in here because `src/server.py` is FastAPI:
+
+@/home/antho/.claude/rules-scoped/fastapi.md
