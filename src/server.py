@@ -2,6 +2,7 @@
 
 import logging
 import re
+import tempfile
 from pathlib import Path
 from typing import Annotated, Optional
 
@@ -93,6 +94,18 @@ class ArticleResponse(BaseModel):
     zip_path: str
 
 
+# OS temp dir (/tmp on Linux, %TEMP% on Windows, where Apollo drops reel audio),
+# the project data dir, and the Telegram MCP inbox.
+_TRANSCRIBE_ROOTS = tuple(
+    Path(p).resolve()
+    for p in (
+        tempfile.gettempdir(),
+        Path(__file__).resolve().parent.parent / "data",
+        Path.home() / ".claude" / "channels" / "telegram" / "inbox",
+    )
+)
+
+
 class TranscribeRequest(BaseModel):
     file_path: str
 
@@ -100,14 +113,11 @@ class TranscribeRequest(BaseModel):
     @classmethod
     def must_be_safe_path(cls, v: str) -> str:
         v = v.strip()
-        allowed_prefixes = (
-            "/tmp/",
-            "/home/antho/projects/reels-digest-agent/data/",
-            "/home/antho/.claude/channels/telegram/inbox/",
-        )
-        if not v.startswith(allowed_prefixes):
+        # resolve() collapses ".." so a path can't climb out of an allowed dir.
+        path = Path(v).resolve()
+        if not any(path.is_relative_to(root) for root in _TRANSCRIBE_ROOTS):
             raise ValueError(
-                "file_path must live under /tmp/, the project data dir, "
+                "file_path must live under the temp dir, the project data dir, "
                 "or the Telegram MCP inbox."
             )
         return v

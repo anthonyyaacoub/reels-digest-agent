@@ -36,7 +36,7 @@ Do NOT put secrets here. Put the *name* of an env var or Key Vault secret, never
 ## Endpoints (FastAPI, bearer auth from `WEBHOOK_SECRET`)
 - `POST /api/reel` — queue Instagram URL. Idempotent. Response action ∈ `{queued, requeued, already_pending, already_done}`.
 - `POST /api/article` — synchronous article fetch. Returns `{title, author, image_count, zip_path}`. Zip path is absolute on this host.
-- `POST /api/transcribe` — Whisper transcription. Body `{"file_path": "..."}`. Path-validated to `/tmp/`, project data dir, or `~/.claude/channels/telegram/inbox/`.
+- `POST /api/transcribe` — Whisper transcription. Body `{"file_path": "..."}`. Path-validated (resolved, so `..` can't escape) to the OS temp dir (`/tmp` or Windows `%TEMP%`, where Apollo drops reel audio), project data dir, or `~/.claude/channels/telegram/inbox/`.
 - `GET /api/status` — queue counts `{pending, done, error}`.
 
 ## Telegram
